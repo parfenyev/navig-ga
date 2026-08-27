@@ -15,9 +15,6 @@ import multiprocessing as mp
 from lib.zermelo_env import *
 from lib.shared_memory_utils import *
 
-import cma  # Ensure you run: pip install pycma
-import math
-
 # set up matplotlib
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
@@ -107,8 +104,6 @@ class PolicyNet(nn.Module):
 
     def forward(self, x):
         return self.net(x)
-        #outputs = self.net(x)
-        #return torch.atan2(outputs[..., 0], outputs[..., 1])
 
 # Genetic Algorithm Utils
 def get_flat_params(model):
@@ -125,9 +120,10 @@ def set_flat_params(model, flat_params):
         p.data.copy_(flat_params[idx:idx + size].view_as(p))
         idx += size
 
-def mutate(params, sigma):
-    #return params + sigma * torch.randn_like(params)
-    return params + sigma * torch.randn_like(params) * (params.abs() + 0.1)
+def mutate(params, sigma, prob=1.0):
+    mask = (torch.rand_like(params) < prob).float()
+    noise = sigma * torch.randn_like(params)
+    return params + noise * mask
 
 # Fitness Evaluation
 def evaluate(env, model, episodes):
@@ -179,7 +175,7 @@ def evaluate_population(executor, population, episodes):
     )
     return np.array(fitness, dtype=np.float32)
 
-def train_ga(cfg, flow, shared=True,  generations=150, population_size=300, elite_frac=0.15, immigrant_frac=0.1, episodes=4, n_workers=8):
+def train_ga(cfg, flow, shared=True, generations=200, population_size=320, elite_frac=0.2, immigrant_frac=0.2, start_episodes=2, n_workers=8):
     if n_workers is None:
         n_workers = os.cpu_count()
 
@@ -195,11 +191,11 @@ def train_ga(cfg, flow, shared=True,  generations=150, population_size=300, elit
     param_size = len(get_flat_params(model))
     elite_size = int(population_size * elite_frac)
     immigrant_size = int(population_size * immigrant_frac)
-    
-    rank_weights = torch.arange(elite_size, 0, -1, dtype=torch.float32)
-    #rank_weights = torch.pow(rank_weights, 2.0)
+    parent_size = elite_size // 2
+
+    rank_weights = torch.arange(parent_size, 0, -1, dtype=torch.float32)
     selection_probs = rank_weights / rank_weights.sum()
-    
+       
     population = torch.zeros(population_size, param_size)
  
     for i in range(population_size):
@@ -212,104 +208,55 @@ def train_ga(cfg, flow, shared=True,  generations=150, population_size=300, elit
     with ProcessPoolExecutor(max_workers=n_workers, initializer=worker_init, initargs=(cfg, flow, shared, obs_dim, act_dim)) as executor: 
         
         for gen in range(generations): 
-            if gen==60:
-                episodes *= 5
+
+            episodes = min(start_episodes*5, int(start_episodes*(1.02**gen)))
                 
             fitness = evaluate_population(executor, population, episodes)
             elite_idx = torch.topk(torch.from_numpy(fitness), elite_size).indices
-            elites = population[elite_idx]   
+            elites = population[elite_idx]
 
-            current_best = fitness.max().item()
-            current_mean = fitness[elite_idx.numpy()].mean()
+            elite_fitness_1 = fitness[elite_idx.numpy()]
+            elite_fitness_2 = evaluate_population(executor, elites, episodes * 2)
+            combined_fitness = elite_fitness_1 * (1/3) + elite_fitness_2 * (2/3)
+
+            current_best = combined_fitness.max()
+            current_mean = combined_fitness.mean()
             reward_history.append(current_best)
             mean_reward_history.append(current_mean)
             plot_rewards(reward_history, mean_reward_history)
 
+            parent_idx = torch.topk(torch.from_numpy(combined_fitness), parent_size).indices
+            parents = elites[parent_idx]
+
             # annealing mutations
-            mutation_sigma = max(0.1, 1.0 * (0.985 ** gen))
+            mutation_sigma = max(0.05, 0.5 * (0.99 ** gen))
+            mutation_prob = 0.1 #max(0.05, 0.5 * (0.985 ** gen))
 
             # Create next generation
-            new_population = elites.clone()
+            new_population = torch.empty_like(population)
+            new_population[:parent_size] = parents
 
-            while len(new_population) < population_size - immigrant_size:
-                #i = random.randrange(elite_size)
-                i = torch.multinomial(selection_probs, num_samples=1).item()
-                child = elites[i].clone()
-                child = mutate(child, mutation_sigma)
-                new_population = torch.vstack([new_population, child.unsqueeze(0)])
+            # Generate offspring
+            idx = parent_size
+            while idx < population_size - immigrant_size:
+                p = torch.multinomial(selection_probs, 1).item()
+                #p = torch.randint(parent_size, (1,)).item()
+                new_population[idx] = mutate(parents[p], mutation_sigma, mutation_prob)
+                idx += 1
 
-            for _ in range(immigrant_size):
-                random_model = PolicyNet(obs_dim, act_dim)
-                genome = get_flat_params(random_model)
-                new_population = torch.vstack([new_population, genome.unsqueeze(0)])
+            # Add immigrants
+            for idx in range(population_size - immigrant_size, population_size):
+                p = torch.randint(parent_size, (1,)).item()
+                new_population[idx] = mutate(parents[p], 0.5, 0.3)
+                #random_model = PolicyNet(obs_dim, act_dim)
+                #new_population[idx] = get_flat_params(random_model)
 
             population = new_population
 
-    best_genome = elites[fitness[elite_idx].argmax()]
-    set_flat_params(model, best_genome)
+    # best genome
+    set_flat_params(model, parents[0])
 
     return model, reward_history, mean_reward_history
-
-def train_cma_es(cfg, flow, shared, init_model, generations=50, episodes=50, n_workers=8):
-    if n_workers is None:
-        n_workers = os.cpu_count()
-
-    # Only for determining dimensions and initial parameters
-    if shared:
-        env = ZermeloEnv(cfg, attach_shared_velocity_field(flow))
-    else:
-        env = ZermeloEnv(cfg, flow)
-        
-    obs_dim = env.observation_space.shape[0]
-    act_dim = env.action_space.shape[0]
-    
-    # Grab parameter sizes and initial values
-    initial_params = get_flat_params(init_model).detach().cpu().numpy()
-    sigma = float(np.std(initial_params) * 0.005)
-
-    # Initialize CMA-ES optimizer
-    opts = {
-        'CMA_diagonal': False,  
-    } 
-    es = cma.CMAEvolutionStrategy(initial_params, sigma0=sigma, inopts=opts)
- 
-    reward_history = []
-    mean_reward_history = []
-   
-    with ProcessPoolExecutor(max_workers=n_workers, initializer=worker_init, initargs=(cfg, flow, shared, obs_dim, act_dim)) as executor: 
-        
-        for gen in range(generations):
-            if es.stop():
-                print("CMA-ES convergence criteria reached early.")
-                break
-                
-            # 1. Ask CMA-ES for a generation of candidate weights (list of numpy arrays)
-            population = es.ask()
-            
-            # 2. Parallel Evaluation
-            rewards = evaluate_population(executor, population, episodes)
-            
-            # 3. CMA-ES minimizes, so convert max rewards to a loss/cost function (negation)
-            costs = -rewards
-            
-            # 4. Update the internal covariance matrix and mean vector
-            es.tell(population, costs)
-
-            # Logging & Tracking performance
-            current_best = rewards.max().item()
-            current_mean = rewards.mean().item()
-            reward_history.append(current_best)
-            mean_reward_history.append(current_mean)
-            plot_rewards(reward_history, mean_reward_history)
-
-    # Extract the absolute best parameter set found over the entire run
-    best_genome = es.result.xbest
-    
-    # Apply to a final model instance
-    final_model = PolicyNet(obs_dim, act_dim)
-    set_flat_params(final_model, best_genome)
-
-    return final_model, reward_history, mean_reward_history
 
 def evaluate_policy(model, env, n_eval=5000):
     model.eval()

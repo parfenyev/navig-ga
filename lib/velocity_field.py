@@ -16,7 +16,7 @@ class VelocityField:
     def vort(self, x, y, t):
         raise NotImplementedError
 
-# Example 1: Steady Vortex Flow
+# Example: Steady Vortex Flow
 class VortexFlow(VelocityField):
     def __init__(self, omega=0.9):
         self.ω = omega
@@ -30,7 +30,7 @@ class VortexFlow(VelocityField):
     def vort(self, x, y, t):
         return 2*self.ω
 
-# Example 2: Sink+Rotation Flow
+# Example: Sink+Rotation Flow
 class SRFlow(VelocityField):
     def __init__(self, a=-0.3, b=0.5):
         self.a = a
@@ -45,22 +45,7 @@ class SRFlow(VelocityField):
     def vort(self, x, y, t):
         return 2*(self.b-t)
 
-# Example 3: Taylor-Green Flow
-class TGFlow(VelocityField):
-    def __init__(self, u0=1.0, k=3.0):
-        self.u0 = u0
-        self.k = k
-
-    def velX(self, x, y, t):
-        return self.u0*np.sin(self.k*x)*np.cos(self.k*y)
-
-    def velY(self, x, y, t):
-        return -self.u0*np.cos(self.k*x)*np.sin(self.k*y)
-
-    def vort(self, x, y, t):
-        return 2*self.u0*self.k*np.sin(self.k*x)*np.sin(self.k*y)
-
-# Examples 4 and 5: 2D Turbulence
+# Example: 2D Turbulence
 class TurbFlow(VelocityField):
     def __init__(self, filename=None, *, u_data=None, v_data=None, steady=True):
         self.n = 512
@@ -192,30 +177,6 @@ SR_CONFIG = dict(
     x_max=1.2,
     y_min=-0.3,
     y_max=1.2,
-)
-
-TG_CONFIG = dict(
-    steady_env=True,
-    Va=0.1, # agent's velocity
-    Δt=np.pi/30, # reaction time
-    T_max=90.0, # max duration of an episode
-    n_steps=10, # num of integration steps
-
-    # start zone
-    xA=2*np.pi/3,
-    yA=np.pi/3,
-    rA=0.2,
-
-    # target zone
-    xB=3*np.pi/2,
-    yB=3*np.pi/2,
-    rB=0.2,
-
-    # domain
-    x_min=0,
-    x_max=2*np.pi,
-    y_min=0,
-    y_max=2*np.pi,
 )
 
 TURB_STEADY_P1 = dict(
