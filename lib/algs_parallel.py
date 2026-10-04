@@ -246,10 +246,10 @@ def train_ga(cfg, flow, shared=True, generations=200, population_size=320, elite
 
             # Add immigrants
             for idx in range(population_size - immigrant_size, population_size):
-                p = torch.randint(parent_size, (1,)).item()
-                new_population[idx] = mutate(parents[p], 0.5, 0.3)
-                #random_model = PolicyNet(obs_dim, act_dim)
-                #new_population[idx] = get_flat_params(random_model)
+                #p = torch.randint(parent_size, (1,)).item()
+                #new_population[idx] = mutate(parents[p], 0.5, 0.3)
+                random_model = PolicyNet(obs_dim, act_dim)
+                new_population[idx] = get_flat_params(random_model)
 
             population = new_population
 

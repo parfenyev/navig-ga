@@ -76,7 +76,10 @@ class TurbFlow(VelocityField):
 
 
         # Compute max velocity for first snapshot
-        self.u0_max = np.max(np.sqrt(self.u_data[0]**2 + self.v_data[0]**2))
+        if steady:
+            self.u0_max = np.max(np.sqrt(self.u_data**2 + self.v_data**2))
+        else:
+            self.u0_max = np.max(np.sqrt(self.u_data[0]**2 + self.v_data[0]**2))
         
     def _interp_xyt(self, field, x, y, t):
         if self.steady:
@@ -146,7 +149,7 @@ VORTEX_CONFIG = dict(
     # target zone
     xB=1.0,
     yB=0.0,
-    rB=0.01,
+    rB=0.015,
 
     # domain
     x_min=-0.3,
@@ -170,7 +173,7 @@ SR_CONFIG = dict(
     # target zone
     xB=1.0,
     yB=0.0,
-    rB=0.01,
+    rB=0.015,
 
     # domain
     x_min=-0.3,
@@ -183,8 +186,8 @@ TURB_STEADY_P1 = dict(
     steady_env=True,
     T_max=4.0, # max duration of an episode
     n_steps=10, # num of integration steps
-    Va=3.8185675,
-    Δt=0.008227151,
+    Va=4.4837465,
+    Δt=0.0070066242,
     # start zone
     xA=1.2,
     yA=5.5,
@@ -204,8 +207,8 @@ TURB_STEADY_P2 = dict(
     steady_env=True,
     T_max=4.0, # max duration of an episode
     n_steps=10, # num of integration steps
-    Va=3.8185675,
-    Δt=0.008227151,
+    Va=4.4837465,
+    Δt=0.0070066242,
     # start zone
     xA=5.8,
     yA=5.5,
@@ -225,8 +228,8 @@ TURB_TIME_P1 = dict(
     steady_env=False,
     T_max=4.0, # max duration of an episode
     n_steps=10, # num of integration steps
-    Va=3.8185675,
-    Δt=0.008227151,
+    Va=4.4837465,
+    Δt=0.0070066242,
     # start zone
     xA=5.5,
     yA=2.5,
@@ -246,8 +249,8 @@ TURB_TIME_P2 = dict(
     steady_env=False,
     T_max=4.0, # max duration of an episode
     n_steps=10, # num of integration steps
-    Va=3.8185675,
-    Δt=0.008227151,
+    Va=4.4837465,
+    Δt=0.0070066242,
     # start zone
     xA=1.4,
     yA=3.0,
