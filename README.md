@@ -2,8 +2,9 @@
 
 We study minimum-time navigation between two points in a known two-dimensional fluid flow for a vessel with fixed-magnitude slip velocity and controllable direction. The navigation policy is parameterized by a neural network and optimized using a genetic algorithm that evolves an ensemble of candidate strategies through Darwinian selection and parameter mutation, without crossover. The method recovers analytical and numerical optimal-control solutions in several benchmark cases, including two-dimensional turbulence, and outperforms Q-learning and one-step actor-critic method. We further show that the learned navigation strategies are robust to variations in the starting position and to unresolved small-scale turbulent fluctuations, provided that the characteristic velocity of these fluctuations remains small compared to the vessel's slip velocity. The proposed approach provides a compact representation of the navigation policy, is readily parallelizable, and eliminates the need for reward shaping, offering an efficient alternative to existing analytical and numerical methods for computing minimum-time trajectories in complex flows.
 
+<!--
 For more information, please refer to the following:
 - V. Parfenyev, "Learning minimum-time navigation policies in two-dimensional flows with a genetic algorithm", [arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX).
 - V. Parfenyev, "Optimal navigation in two-dimensional flows: Control theory and reinforcement learning", Phys. Rev. E 114, 015104 (2026); [arXiv:2512.08766](https://arxiv.org/abs/2512.08766).
-
+-->
 You can download the 2D turbulence data [here](https://parfenyev.itp.ac.ru/data/navig-ga/).
